@@ -1,7 +1,8 @@
 # pomodoro
 Pomodoro timer for nerds
 
-Demo (time x200 fasten):
+Demo (time x200 faster):
+
 [![asciicast](https://asciinema.org/a/4yA20MpIGqgmnRrpQsqFfrJRU.svg)](https://asciinema.org/a/4yA20MpIGqgmnRrpQsqFfrJRU)
 
 ## Installation
