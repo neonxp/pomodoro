@@ -18,12 +18,18 @@ brew install neonxp/tap/pomodoro
 Build image:
 
 ```shell
-docker build -t pomodoro .
+docker build -t pomodoro:master .
+```
+
+or pull image from GitHub:
+
+```shell
+docker pull ghcr.io/neonxp/pomodoro:master
 ```
 
 Run image
 ```shell
-docker run -it --rm pomodoro
+docker run -it --rm pomodoro:master
 ```
 
 ### With golang
