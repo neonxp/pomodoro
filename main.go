@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"time"
+
+	"github.com/eiannone/keyboard"
 )
 
 type state int
@@ -11,26 +16,60 @@ const (
 	Working state = iota
 	Break
 	LongBreak
+	Pause
 )
 
 var (
 	currentState    = Working
+	prevState       = Working
 	currentDuration = 25 * 60
 	pomodoros       = 1
 )
 
 func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Kill, os.Interrupt)
+	defer cancel()
+	go timer(ctx)
+	go keys(cancel)
+	<-ctx.Done()
+}
+
+func keys(cancel func()) {
+	if err := keyboard.Open(); err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = keyboard.Close()
+	}()
+
 	for {
-		clearline()
-		switch currentState {
-		case Working:
-			fmt.Printf("🍅 #%d Working (%s)", pomodoros, secondsToMinutes(currentDuration))
-		case Break:
-			fmt.Printf("☕️ #%d Break (%s)", pomodoros, secondsToMinutes(currentDuration))
-		case LongBreak:
-			fmt.Printf("☕️ #%d Long break (%s)", pomodoros, secondsToMinutes(currentDuration))
+		char, _, err := keyboard.GetKey()
+		if err != nil {
+			panic(err)
 		}
-		currentDuration--
+		switch string(char) {
+		case "p":
+			if currentState != Pause {
+				prevState = currentState
+				currentState = Pause
+			} else {
+				currentState = prevState
+			}
+		case "n":
+			currentDuration = 0
+		case "q":
+			cancel()
+			return
+		}
+	}
+}
+
+func timer(ctx context.Context) {
+	needClear := false
+	for {
+		if currentState != Pause {
+			currentDuration--
+		}
 		if currentDuration < 0 {
 			switch currentState {
 			case Working:
@@ -48,16 +87,49 @@ func main() {
 			}
 			bell()
 		}
-		<-time.After(1 * time.Second)
+		if needClear {
+			clear()
+		}
+		needClear = true
+		displayTimer()
+
+		select {
+		case <-time.After(1 * time.Second):
+			// Do nothing
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
-func bell() {
-	fmt.Print("\a")
+func displayTimer() {
+	stateText := ""
+	if currentState == Pause {
+		stateText = fmt.Sprintf("[Paused] %s", getStateText(prevState))
+	} else {
+		stateText = getStateText(currentState)
+	}
+	fmt.Printf("%s – %s\n(keys: p - pause/resume timer, n - next phase, q - quit)", stateText, secondsToMinutes(currentDuration))
 }
 
-func clearline() {
-	fmt.Print("\x1b[2K\r")
+func getStateText(state state) string {
+	switch state {
+	case Working:
+		return fmt.Sprintf("🍅 #%d Working", pomodoros)
+	case Break:
+		return fmt.Sprintf("☕️ #%d Break", pomodoros)
+	case LongBreak:
+		return fmt.Sprintf("☕️ #%d Long break", pomodoros)
+	}
+	return ""
+}
+
+func bell() {
+	fmt.Print("\u0007")
+}
+
+func clear() {
+	fmt.Print("\u001B[2K\u001B[F\u001B[2K\r")
 }
 
 func secondsToMinutes(inSeconds int) string {
